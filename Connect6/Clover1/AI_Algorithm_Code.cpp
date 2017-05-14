@@ -62,15 +62,17 @@ void myturn(int cnt) {
 	cloverAI.read_board(showBoard);
 	int x[2], y[2];
 	int player = 1;
-	if (cnt == 0)
+	if (cnt == 1)
 	{
+		OutputDebugStringA("Put at center");
 		// TODO fix me
 		x[0] = 9;
 		y[0] = 9;
 		cloverAI.commit_action(put_center());
 	}
 	else{
-
+		printf_debug("Current Map :");
+		cloverAI.now().print_dbg();
 		Action action = cloverAI.nextAction();
 		cloverAI.commit_action(action);
 		x[0] = action.stone1.x;

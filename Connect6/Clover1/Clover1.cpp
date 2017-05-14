@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <exception>
+#include <string>
 
 
 bool is_in_board(int x, int y)
@@ -22,6 +23,13 @@ void printf_debug(const char* format, ...)
 	va_end(arglist);
 }
 
+void dbg_print_action(Action& action)
+{
+	printf_debug("Action(%d,%d / %d,%d)", 
+		action.stone1.x, action.stone1.y, 
+		action.stone2.x, action.stone2.y);
+}
+
 
 Action put_center()
 {
@@ -31,20 +39,29 @@ Action put_center()
 }
 
 
+
 list<Action> generate_simple(Plate& node, Player player)
 {
 	// TODO///////////////
 	// all possible two stone action
 	
 	bool near_area[MAX_X][MAX_Y] = { 0 };
-
+	/*
 	const int neighbor_n = 24;
 	int dx[neighbor_n] = {-3, 0, 3, -2, 0, 2, -1, 0, 1, 
-							-3, -2 ,-1, 1,2,3, 
-							-1,0,1,-2,0,2,-3,0,3};
-	int dy[neighbor_n] = {-3,-3,-3, -2,-2,-2,-1,-1,-1, 
-								0,0,0,0,0,0,
+							-3,-2,-1, 1,2,3, 
+							-1,0,1, -2,0,2, -3,0,3};
+	int dy[neighbor_n] = {-3,-3,-3, -2,-2,-2, -1,-1,-1, 
+								0,0,0, 0,0,0,
 							-1,-1,-1,-2,-2,-2,-3,-3,-3};
+	*/
+	const int neighbor_n = 16;
+	int dx[neighbor_n] = { -2, 0, 2, -1, 0, 1,
+		-2, -1, 1, 2,
+		-1, 0, 1, -2, 0, 2,};
+	int dy[neighbor_n] = { -2, -2, -2, -1, -1, -1,
+		0, 0, 0, 0,
+		-1, -1, -1, -2, -2, -2 };
 	for (int x = 0; x < MAX_X; x++)
 	{
 		for (int y = 0; y < MAX_Y; y++)
@@ -63,6 +80,7 @@ list<Action> generate_simple(Plate& node, Player player)
 			}
 		}
 	}
+
 	vector<Position> candidate_point;
 	candidate_point.reserve(MAX_X * MAX_Y);
 	for (int x = 0; x < MAX_X; x++)
@@ -89,6 +107,21 @@ list<Action> generate_simple(Plate& node, Player player)
 }
 
 
+list<Action> generate_threaten(Plate& node, Player player)
+{
+	auto candidates = generate_simple(node, player.color());
+	list<Action> threat_actions;
+	for (auto c : candidates)
+	{
+		auto next = node.do_action(c);
+		if (next.can_win(Player::me()))
+			threat_actions.push_back(c);
+	}
+	printf_debug("%d threat candidate generated", threat_actions.size());
+	return candidates;
+}
+
+
 int heuristic_eval(Plate& node, Player& player)
 {
 	int val = rand() % 10 - 5;
@@ -99,12 +132,13 @@ int heuristic_eval(Plate& node, Player& player)
 
 int eval(Plate &node, int depth, Player player)
 {
-	if (node.can_win(player))
-		return 1000;
+	printf_debug("eval(depth=%d, player=%d)", depth, player.color());
 	if (node.always_lose(player))
 		return -1000;
+	if (node.can_win(player))
+		return 1000;
 
-	if (depth == 0)
+	if (depth == 0 )
 	{
 		return heuristic_eval(node, player);
 	}
@@ -128,24 +162,52 @@ void Clover1::read_board(int(*showBoard)(int, int))
 		for (int y = 0; y < MAX_Y; y++)
 		{
 			board[x][y] = showBoard(x, y);
-
 		}
 	}
+	curPlate.set(board);
+}
+
+Action Clover1::best_depence(Plate& plate)
+{
+	list<Action> candidates = generateCandidate(curPlate);
+	for (auto c : candidates)
+	{
+		auto next = curPlate.do_action(c);
+		if (!next.can_win(Player::enemy()))
+			return c;
+	}
+	printf_debug("No... there is no way to depence");
+	return candidates.front();
 }
 
 Action Clover1::nextAction()
 {
+	printf_debug("next Action");
+	curPlate.print_dbg();
+	if (curPlate.can_win(Player::enemy()))
+	{
+		return best_depence(curPlate);
+	}
 	// Generate Candidate
-	list<Action> candidates = generateCandidate(curPlate);
+	
+	list<Action> candidates = generate_threaten(curPlate, Player::me());
 
+	printf_debug("Num candidate : %d", candidates.size());
 	// Select best
 	BestAnswer best_answer;
 	for (auto c : candidates)
 	{
 		auto next = curPlate.do_action(c);
-		int score = -1 * eval(next, max_depth - 1, Player::enemy());
+		int score = eval(next, max_depth, Player::me());
 		best_answer.update_max(score, c);
+		//if (score > -100)
+		{
+			dbg_print_action(c);
+			printf_debug("score : %d", score);
+		}
 	}
+	printf_debug("I will do :");
+	dbg_print_action(best_answer.action());
 	return best_answer.action();
 }
 
@@ -260,10 +322,38 @@ bool Plate::can_win(Player& player)
 				return iswin;
 		}
 	}
+
 	return iswin;
 }
 
 bool Plate::always_lose(Player& player)
 {
 	return can_win(player.oppo());
+}
+
+
+void Plate::print_stdout()
+{
+	for (int y = 0; y < MAX_Y; y++)
+	{
+		for (int x = 0; x < MAX_X; x++)
+		{
+			printf("%d", board[x][y]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
+void Plate::print_dbg()
+{
+	for (int y = 0; y < MAX_Y; y++)
+	{
+		string s;
+		for (int x = 0; x < MAX_X; x++)
+		{
+			s += to_string(board[x][y]);
+		}
+		printf_debug(s.c_str());
+	}
 }

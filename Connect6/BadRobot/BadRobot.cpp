@@ -1,6 +1,6 @@
 #define BOARD_SIZE 19
 // Can be a value from 1-3  1 being hardest, 3 being the easiest AI to play against.  
-#define DIFFICULTY 3
+#define DIFFICULTY 1
 
 #include <string>
 using namespace std;

@@ -72,7 +72,11 @@ class Player{
 public:
 	Player(int p){ player = p; }
 	Player oppo(){
-		return Player(2 - player);
+		return Player(3 - player);
+	}
+
+	static Player me(){
+		return Player(1);
 	}
 	static Player enemy(){
 		return Player(2);
@@ -93,23 +97,23 @@ class Plate
 	int board[MAX_X][MAX_Y];
 public:
 	Plate(){
-		memset(board, MAX_X * MAX_Y, 0);
+		memset(board, 0, MAX_X * MAX_Y * sizeof(int));
 		void printf_debug(const char* format, ...);
 	}
 	Plate(Plate& other)
 	{
-		memcpy(board, other.board, MAX_X * MAX_Y);
+		memcpy(board, other.board, MAX_X * MAX_Y * sizeof(int));
 	}
+	void set(int board_[MAX_X][MAX_Y]){
+		memcpy(board, board_, MAX_X * MAX_Y * sizeof(int));
+	}
+	
 
 	bool is_block(int x, int y, int color){ return board[x][y] > 0 && board[x][y] != color; }
 	bool has_stone(int x, int y){ return board[x][y] > 0; }
 	bool has_stone(Position& p){ return board[p.x][p.y] > 0; }
 	void put_stone(Position& p, int player);
 	Plate do_action(Action& action);
-	// Assuming enemy turn, will is lose?
-	bool isFail_1();
-	// Assuming my turn, will i win?
-	bool isSuc_1();
 
 
 
@@ -119,8 +123,11 @@ public:
 	bool can_win_checkdiag2(int r, int c, int color);
 	bool can_win(Player& player);
 
-
 	bool always_lose(Player& player);
+
+	//
+	void print_stdout();
+	void print_dbg();
 };
 
 
@@ -130,6 +137,16 @@ public:
 	Action nextAction();
 	void commit_action(Action& action);
 	void read_board( int(*pf)(int, int) );
+
+
+	Action best_depence(Plate& plate);
+	Plate now() {
+		return curPlate;
+	}
+	Clover1()
+	{
+		max_depth = 2;
+	}
 private:
 	int max_depth;
 	list<Action> generateCandidate(Plate& plate);
