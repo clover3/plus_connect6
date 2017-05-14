@@ -53,7 +53,7 @@ list<Action> generate_simple(Plate& node, Player player)
 							-1,0,1, -2,0,2, -3,0,3};
 	int dy[neighbor_n] = {-3,-3,-3, -2,-2,-2, -1,-1,-1, 
 								0,0,0, 0,0,0,
-							-1,-1,-1,-2,-2,-2,-3,-3,-3};
+							1,1,1,2,2,2,3,3,3};
 	*/
 	const int neighbor_n = 16;
 	int dx[neighbor_n] = { -2, 0, 2, -1, 0, 1,
@@ -61,7 +61,7 @@ list<Action> generate_simple(Plate& node, Player player)
 		-1, 0, 1, -2, 0, 2,};
 	int dy[neighbor_n] = { -2, -2, -2, -1, -1, -1,
 		0, 0, 0, 0,
-		-1, -1, -1, -2, -2, -2 };
+		+1, +1, +1, +2, +2, +2 };
 	for (int x = 0; x < MAX_X; x++)
 	{
 		for (int y = 0; y < MAX_Y; y++)
@@ -142,7 +142,7 @@ int eval(Plate &node, int depth, Player player)
 	{
 		return heuristic_eval(node, player);
 	}
-
+	
 	auto candidate = generate_simple(node, player);
 	BestAnswer best_answer;
 	for(auto c : candidate)
@@ -169,10 +169,12 @@ void Clover1::read_board(int(*showBoard)(int, int))
 
 Action Clover1::best_depence(Plate& plate)
 {
-	list<Action> candidates = generateCandidate(curPlate);
+	list<Action> candidates = generate_simple(plate, 1);
+	printf_debug("best_depence - %d options...", candidates.size());
 	for (auto c : candidates)
 	{
-		auto next = curPlate.do_action(c);
+		dbg_print_action(c);
+		auto next = plate.do_action(c);
 		if (!next.can_win(Player::enemy()))
 			return c;
 	}
@@ -186,6 +188,7 @@ Action Clover1::nextAction()
 	curPlate.print_dbg();
 	if (curPlate.can_win(Player::enemy()))
 	{
+		printf_debug("Oooops. We must defense.");
 		return best_depence(curPlate);
 	}
 	// Generate Candidate
@@ -198,9 +201,9 @@ Action Clover1::nextAction()
 	for (auto c : candidates)
 	{
 		auto next = curPlate.do_action(c);
-		int score = eval(next, max_depth, Player::me());
+		int score = heuristic_eval(next, Player::me());
 		best_answer.update_max(score, c);
-		//if (score > -100)
+		if (score > -100)
 		{
 			dbg_print_action(c);
 			printf_debug("score : %d", score);
@@ -248,7 +251,7 @@ bool Plate::can_win_checkrow(int r, int c, int color)
 			blocked++;
 		else if (board[c][r+i] == color)
 			ours++;
-		else if (is_block(c, r, color))
+		else if (is_block(c, r+i, color))
 			blocked++;
 	}
 	return (ours > 3) && (blocked == 0);

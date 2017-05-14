@@ -109,7 +109,10 @@ public:
 	}
 	
 
-	bool is_block(int x, int y, int color){ return board[x][y] > 0 && board[x][y] != color; }
+	bool is_block(int x, int y, int color)
+	{ 
+		return board[x][y] > 0 && board[x][y] != color; 
+	}
 	bool has_stone(int x, int y){ return board[x][y] > 0; }
 	bool has_stone(Position& p){ return board[p.x][p.y] > 0; }
 	void put_stone(Position& p, int player);
