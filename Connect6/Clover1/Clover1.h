@@ -1,6 +1,9 @@
 #pragma once
 #include <cstring>
 #include <list>
+#include <queue> 
+#include <future>
+#include <functional>
 using namespace std;
 
 const int MAX_X = 19;
@@ -14,6 +17,32 @@ const int COLOR_ME = 1;
 const int COLOR_ENEMY = 2;
 
 void printf_debug(const char* format, ...);
+
+
+template <typename T, typename U>
+U foldLeft(const std::vector<T>& data,
+	const U& initialValue,
+	const std::function<U(U, T)>& foldFn) {
+	typedef typename std::vector<T>::const_iterator Iterator;
+	U accumulator = initialValue;
+	Iterator end = data.cend();
+	for (Iterator it = data.cbegin(); it != end; ++it) {
+		accumulator = foldFn(accumulator, *it);
+	}
+	return accumulator;
+}
+
+
+template <typename T, typename U>
+std::vector<U> mapf(const std::vector<T>& data, const std::function<U(T)> mapper) {
+	std::vector<U> result;
+	foldLeft<T, std::vector<U>&>(data, result, [mapper](std::vector<U>& res, T value)  -> std::vector<U>& {
+		res.push_back(mapper(value));
+		return res;
+	});
+	return result;
+}
+
 
 
 struct Position{
@@ -44,11 +73,51 @@ struct Action
 		player = color;
 		singleAction = single;
 	}
+	Action(Position p1, int color)
+	{
+		stone1 = p1;
+		player = color;
+		singleAction = true;
+	}
 	Action()
 	{}
 };
 
 Action put_center();
+struct MyCmp {
+
+	bool operator()(pair<int, Action>& node1, pair<int, Action>& node2) const
+	{
+		return node1.first > node2.first;
+	}
+};
+
+class TopK
+{
+	int k;
+	vector<int> scores;
+	vector<Action> items;
+	priority_queue<int, std::vector<pair<int, Action>>, MyCmp> queue;
+public:
+	void push(Action action, int score)
+	{
+		queue.push(pair<int, Action>(score, action));
+	}
+	TopK(int k_) {
+		k = k_;
+	}
+	vector<Action> get(){
+		int cnt = k;
+		vector<Action> v;
+		while (cnt && !queue.empty())
+		{
+			pair<int, Action> a = queue.top();
+			v.push_back(a.second);
+			queue.pop();
+		}
+		return v;
+	}
+};
 
 class BestAnswer{
 	int best_score;
@@ -89,6 +158,8 @@ public:
 
 
 
+
+
 class Plate
 {
 	// 0 : Empty
@@ -107,7 +178,9 @@ public:
 	void set(int board_[MAX_X][MAX_Y]){
 		memcpy(board, board_, MAX_X * MAX_Y * sizeof(int));
 	}
-	
+	void copy_to(int board_[MAX_X][MAX_Y]){
+		memcpy(board_, board, MAX_X * MAX_Y * sizeof(int));
+	}
 
 	bool is_block(int x, int y, int color)
 	{ 
@@ -119,6 +192,7 @@ public:
 	Plate do_action(Action& action);
 
 
+	Action find_win(Player& player);
 
 	bool can_win_checkrow(int r, int c, int color);
 	bool can_win_checkcol(int r, int c, int color);
