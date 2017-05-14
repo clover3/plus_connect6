@@ -190,6 +190,7 @@ public:
 	bool has_stone(Position& p){ return board[p.x][p.y] > 0; }
 	void put_stone(Position& p, int player);
 	Plate do_action(Action& action);
+	Plate inverse();
 
 
 	Action find_win(Player& player);
@@ -215,8 +216,8 @@ public:
 	void commit_action(Action& action);
 	void read_board( int(*pf)(int, int) );
 
-
-	Action best_depence(Plate& plate);
+	pair<bool,Action> need_defense(Plate plate);
+	Action threat_defense(Plate& plate);
 	Plate now() {
 		return curPlate;
 	}

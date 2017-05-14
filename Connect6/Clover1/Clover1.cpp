@@ -7,6 +7,7 @@
 #include <exception>
 #include <string>
 
+
 int heuristic_eval(Plate& node, Player& player);
 
 
@@ -108,6 +109,7 @@ vector<Action> generate_one_stone_candidate(Plate& node, Player player)
 
 vector<Action> candi_gen_one_plus_one(Plate& node, Player player)
 {
+	int start = GetTickCount();
 	auto candi_actions = generate_one_stone_candidate(node, Player::me());
 	printf_debug("Num candidate : %d", candi_actions.size());
 
@@ -134,6 +136,7 @@ vector<Action> candi_gen_one_plus_one(Plate& node, Player player)
 			final_candidate.push_back(Action(c.stone1, c2.stone1, 1, false));
 		}
 	}
+	printf_debug("candi_gen_one_plus_one: %d ms" , GetTickCount()- start);
 	return final_candidate;
 }
 
@@ -208,10 +211,10 @@ void Clover1::read_board(int(*showBoard)(int, int))
 	curPlate.set(board);
 }
 
-Action Clover1::best_depence(Plate& plate)
+Action Clover1::threat_defense(Plate& plate)
 {
 	list<Action> candidates = generate_simple(plate, 1);
-	printf_debug("best_depence - %d options...", candidates.size());
+	printf_debug("threat_defense - %d options...", candidates.size());
 	for (auto c : candidates)
 	{
 		auto next = plate.do_action(c);
@@ -224,7 +227,8 @@ Action Clover1::best_depence(Plate& plate)
 
 Action Clover1::nextAction()
 {
-	printf_debug("next Action");
+	printf_debug("========Next Action========");
+	int start_time = GetTickCount();
 	curPlate.print_dbg();
 	if (curPlate.can_win(Player::me()))
 	{
@@ -232,27 +236,34 @@ Action Clover1::nextAction()
 		auto c = curPlate.find_win(Player::me());
 		return c;
 	}
-	if (curPlate.can_win(Player::enemy()))
+	pair<bool, Action> need = need_defense(curPlate);
+	if (need.first)
 	{
 		printf_debug("Oooops. We must defense.");
-		return best_depence(curPlate);
+		printf_debug("Defense : %d", GetTickCount() - start_time);
+		return need.second;
 	}
-	// Generate Candidate
-	
-	// Select best
-	
-	auto candidates = candi_gen_one_plus_one(curPlate, Player::me());
-	BestAnswer best_answer;
-	for (auto c : candidates)
+	else
 	{
-		int score = heuristic_eval(curPlate.do_action(c), Player::me());
-		best_answer.update_max(score, c);
-		dbg_print_action(c);
-		printf_debug("score : %d", score);
+		// Generate Candidate
+
+		// Select best
+
+		auto candidates = candi_gen_one_plus_one(curPlate, Player::me());
+		BestAnswer best_answer;
+		int heuri_time = 0;
+		for (auto c : candidates)
+		{
+			int score = heuristic_eval(curPlate.do_action(c), Player::me());
+			best_answer.update_max(score, c);
+		}
+
+		printf_debug("I will do :");
+		dbg_print_action(best_answer.action());
+		int end_time = GetTickCount();
+		printf_debug("Total Elapsed : %d", end_time - start_time);
+		return best_answer.action();
 	}
-	printf_debug("I will do :");
-	dbg_print_action(best_answer.action());
-	return best_answer.action();
 }
 
 void Clover1::commit_action(Action& action)
@@ -340,6 +351,7 @@ bool Plate::can_win_checkdiag2(int r, int c, int color) {
 	return (ours > 3) && (blocked == 0);
 }
 
+
 // Assuming players turn, can player win?
 bool Plate::can_win(Player& player)
 {
@@ -396,7 +408,13 @@ void Plate::print_dbg()
 		string s;
 		for (int x = 0; x < MAX_X; x++)
 		{
-			s += to_string(board[x][y]);
+			if (board[x][y] == 0)
+				s += " ";
+			else if (board[x][y] == 1)
+				s += "¡Ü";
+			else if (board[x][y] == 2)
+				s += "¡Û";
+
 		}
 		printf_debug(s.c_str());
 	}
@@ -833,4 +851,57 @@ Action Plate::find_win(Player& player)
 	throw new exception("Should have found");
 }
 
+Plate Plate::inverse()
+{
+	Plate r;
+	for (int x = 0; x < MAX_X; x++) {
+		for (int y = 0; y < MAX_Y; y++) {
+			if (board[x][y] = 0)
+				r.board[x][y] = 0;
+			else if (board[x][y] = 1)
+				r.board[x][y] = 2;
+			else if (board[x][y] = 2)
+				r.board[x][y] = 1;
+			else if (board[x][y] = 3)
+				r.board[x][y] = 3;
+		}
+	}
+	return r;
+}
 
+pair<bool, Action> Clover1::need_defense(Plate real_plate)
+{
+	if (real_plate.can_win(Player::enemy()))
+	{
+		return pair<bool, Action>(true, threat_defense(real_plate));
+	}
+	else
+	{
+		printf_debug("Check possible double threat");
+		Plate inversePlate = real_plate.inverse();
+		vector<Action> actions = generate_one_stone_candidate(inversePlate, Player::me());
+		for (auto c : actions)
+		{
+			auto next = inversePlate.do_action(c);
+			int board[MAX_X][MAX_Y];
+			next.copy_to(board);
+			if (calc_threat(board) >= 1 && calc_live3(board) >= 1)
+			{
+				auto candi_action2s = generate_one_stone_candidate(real_plate, Player::me());
+				BestAnswer best;
+				for (auto c2 : candi_action2s)
+				{
+					Plate n2 = real_plate.do_action(c2);
+					int score = heuristic_eval(n2, Player::me());
+					best.update_max(score, c2);
+				}
+
+				Position stone1 = c.stone1;
+				Position stone2 = best.action().stone1;
+
+				return pair<bool, Action>(true, Action(stone1, stone2, 1, false));
+			}
+		}
+		return pair<bool, Action>(false, Action());
+	}
+}

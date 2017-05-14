@@ -150,19 +150,16 @@ static DWORD WINAPI threadLoop(LPVOID) {
 }
 
 int main() {
-	Debug("Main");
 	DWORD mode;
 	//if (GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode))
 	//	puts("직접 실행 불가능한 파일입니다. 육목 알고리즘 대회 툴을 이용해 실행하세요.");
 	
-	Debug("Initialized Board");
 	DWORD tid;
 	event1 = CreateEvent(0, FALSE, FALSE, 0);
 	CreateThread(0, 0, threadLoop, 0, 0, &tid);
 	event2 = CreateEvent(0, TRUE, TRUE, 0);
 
 	while (1) {
-		Debug("Looping");
 		getLine();
 		doCommand();
 	}

@@ -56,7 +56,6 @@ bool g_initialized = false;
 char info[] = { "TeamName:BadRobot,Department:Clover3" };
 
 void myturn(int cnt) {
-	OutputDebugStringA("myturn ENTRY");
 	// 이 부분에서 알고리즘 프로그램(AI)을 작성하십시오. 기본 제공된 코드를 수정 또는 삭제하고 본인이 코드를 사용하시면 됩니다.
 	// 현재 Sample code의 AI는 Random으로 돌을 놓는 Algorithm이 작성되어 있습니다.
 
