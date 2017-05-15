@@ -71,8 +71,8 @@ void myturn(int cnt) {
 		cloverAI.commit_action(put_center());
 	}
 	else{
-		//printf_debug("Current Map :");
-		//cloverAI.now().print_dbg();
+		printf_debug("Current Map :");
+		cloverAI.now().print_plate();
 		Action action = cloverAI.nextAction();
 		cloverAI.commit_action(action);
 		x[0] = action.stone1.x;

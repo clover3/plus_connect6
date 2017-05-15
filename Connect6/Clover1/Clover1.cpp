@@ -195,7 +195,7 @@ Action Clover1::nextAction()
 {
 	printf_debug("========Next Action========");
 	int start_time = GetTickCount();
-	curPlate.print_dbg();
+	//curPlate.print_plate();
 	if (curPlate.can_win(Player::me()))
 	{
 		printf_debug("Kkkkya!! Lets Mak Ta!");
@@ -205,7 +205,7 @@ Action Clover1::nextAction()
 	pair<bool, Action> need = need_defense(curPlate);
 	if (need.first)
 	{
-		printf_debug("Oooops. We must defense.");
+		printf_debug("We must do this defense option.");
 		printf_debug("Defense : %d", GetTickCount() - start_time);
 		return need.second;
 	}
@@ -226,6 +226,7 @@ Action Clover1::nextAction()
 
 		printf_debug("I will do :");
 		dbg_print_action(best_answer.action());
+		printf_debug("My score will be %d", best_answer.score());
 		int end_time = GetTickCount();
 		printf_debug("Total Elapsed : %d", end_time - start_time);
 		return best_answer.action();
@@ -367,19 +368,32 @@ void Plate::print_stdout()
 	printf("\n");
 }
 
-void Plate::print_dbg()
+void Plate::print_plate()
 {
-	for (int y = 0; y < MAX_Y; y++)
+	for (int y = 0; y < MAX_Y * 2 + 1; y++)
 	{
 		string s;
+
+		if (y % 2 == 0)
+			s += "+";
+		if (y % 2 != 0)
+			s += "|";
 		for (int x = 0; x < MAX_X; x++)
 		{
-			if (board[x][y] == 0)
-				s += " ";
-			else if (board[x][y] == 1)
-				s += "¡Ü";
-			else if (board[x][y] == 2)
-				s += "¡Û";
+			if (y % 2 == 0)
+				s += "---+";
+			else 
+			{
+				int state = board[x][y / 2];
+				if (state == 0)
+					s += "   |";
+				else if (state == 1)
+					s += " ¡Ü |";
+				else if (state == 2)
+					s += " ¡Û |";
+				else
+					s += " ? |";
+			}
 
 		}
 		printf_debug(s.c_str());
@@ -390,7 +404,7 @@ void Plate::print_dbg()
 
 int get_state(int board[MAX_X][MAX_Y], int x, int y)
 {
-	if (x< 0 || x > MAX_X || y < 0 || y > MAX_Y)
+	if (x < 0 || x >= MAX_X || y < 0 || y >= MAX_Y)
 		return 3;
 	else
 		return board[x][y];
@@ -416,7 +430,8 @@ int count_threat(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy, int 
 	int pre_y = y_0 - 1 * dy;
 	int next_x = x_0 + 6 * dx;
 	int next_y = y_0 + 6 * dy;
-	if (ours == 4 && unblocked == 2) {
+	if ((ours == 4 && unblocked == 2) 
+		|| (ours == 5 && unblocked == 1)) {
 		bool more_connection = (get_state(board, pre_x, pre_y) == color) 
 			|| (get_state(board, next_x, next_y) == color);
 		if (!more_connection)
@@ -728,13 +743,13 @@ int heuristic_eval(Plate& node, int player)
 	int n_live2 = calc_live2(board, color);
 	int n_dead3 = calc_dead3(board, color);
 	int n_dead2 = calc_dead2(board, color);
-	printf_debug("TLL count : %d %d %d %d %d", n_threats, n_live3, n_live2, n_dead3, n_dead2);
+	//printf_debug("TLL count : %d %d %d %d %d", n_threats, n_live3, n_live2, n_dead3, n_dead2);
 	// TODO implement this
 	int score = n_threats * 1000
 		+ n_live3 * 700
-		+ n_live2 * 150
-		+ n_dead3 * 30
-		+ n_dead2 * 10;
+		+ n_live2 * 200
+		+ n_dead3 * 500
+		+ n_dead2 * 50;
 	if (n_threats >= 3)
 		score = 1000 * 1000;
 	return score;
@@ -845,14 +860,16 @@ pair<bool, Action> Clover1::need_defense(Plate real_plate)
 	printf_debug("Enemy theat : %d", score);
 	if ( score <= -1000 )
 	{
-		printf_debug("We need defense");
+		printf_debug("We need defense!");
 		auto actions = candi_gen_one_plus_one(real_plate, Player::enemy(), true);
 		BestAnswer best_answer;
 		for (auto c : actions)
 		{
-			int score = -heuristic_eval(curPlate.do_action(c), COLOR_ENEMY);
+			int score = - heuristic_eval(real_plate.do_action(c), COLOR_ENEMY);
+			//printf_debug("Searching best defense : %d", score);
 			best_answer.update_max(score, c);
 		}
+		printf_debug("Enemy theat decreased : %d->%d", score, best_answer.score());
 		return pair<bool, Action>(true, best_answer.action());
 	}
 	return pair<bool, Action>(false, Action());

@@ -128,7 +128,7 @@ public:
 	{
 		if (score > best_score)
 		{
-			score = best_score;
+			best_score = score;
 			best_action = Action(action);
 		}
 	}
@@ -205,7 +205,7 @@ public:
 
 	//
 	void print_stdout();
-	void print_dbg();
+	void print_plate();
 };
 
 
