@@ -38,11 +38,9 @@ int showBoard(int x, int y) : [x, y] 좌표에 무슨 돌이 존재하는지 보여주는 함수 (
 #include <time.h>
 #include "Connect6Algo.h"
 
-
 #include <cstring>
 #include <list>
 #include <queue> 
-#include <future>
 #include <functional>
 using namespace std;
 
@@ -82,6 +80,7 @@ std::vector<U> mapf(const std::vector<T>& data, const std::function<U(T)> mapper
 	});
 	return result;
 }
+
 
 
 
@@ -149,7 +148,7 @@ public:
 	vector<Action> get(){
 		int cnt = k;
 		vector<Action> v;
-		while (cnt && !queue.empty())
+		while (cnt-- && !queue.empty())
 		{
 			pair<int, Action> a = queue.top();
 			v.push_back(a.second);
@@ -211,7 +210,7 @@ public:
 		memset(board, 0, MAX_X * MAX_Y * sizeof(int));
 		void printf_debug(const char* format, ...);
 	}
-	Plate(Plate& other)
+	Plate(const Plate& other)
 	{
 		memcpy(board, other.board, MAX_X * MAX_Y * sizeof(int));
 	}
@@ -229,7 +228,7 @@ public:
 	bool has_stone(int x, int y){ return board[x][y] > 0; }
 	bool has_stone(Position& p){ return board[p.x][p.y] > 0; }
 	void put_stone(Position& p, int player);
-	Plate do_action(Action& action);
+	Plate do_action(Action& action) const;
 	Plate inverse();
 
 
@@ -386,7 +385,7 @@ vector<Action> candi_gen_one_plus_one(Plate& node, Player player, bool reverse)
 
 	int color = player.color();
 	function<TopK(vector<Action>, Plate)> get_top_k = [color, reverse](vector<Action> actions, Plate node){
-		TopK topK(5);
+		TopK topK(120);
 		for (auto c : actions)
 		{
 			auto next = node.do_action(c);
@@ -411,7 +410,7 @@ vector<Action> candi_gen_one_plus_one(Plate& node, Player player, bool reverse)
 			final_candidate.push_back(Action(c.stone1, c2.stone1, 1, false));
 		}
 	}
-	printf_debug("final_candidate : %d", candi_actions.size());
+	printf_debug("final_candidate : %d", final_candidate.size());
 	printf_debug("candi_gen_one_plus_one: %d ms", GetTickCount() - start);
 	return final_candidate;
 }
@@ -479,6 +478,7 @@ Action Clover1::nextAction()
 	{
 		printf_debug("We must do this defense option.");
 		printf_debug("Defense : %d", GetTickCount() - start_time);
+		printf_debug("Total Elapsed : %dms", GetTickCount() - start_time);
 		return need.second;
 	}
 	else
@@ -516,7 +516,7 @@ list<Action> Clover1::generateCandidate(Plate& plate)
 	return generate_simple(plate, 1);
 }
 
-Plate Plate::do_action(Action& action)
+Plate Plate::do_action(Action& action) const
 {
 	Plate result = *this;
 	result.put_stone(action.stone1, action.player);
@@ -590,36 +590,6 @@ bool Plate::can_win_checkdiag2(int r, int c, int color) {
 	return (ours > 3) && (blocked == 0);
 }
 
-
-// Assuming players turn, can player win?
-bool Plate::can_win(Player& player)
-{
-	// TODO
-	int color = player.color();
-	// Type 1 : OOOO (4 in row)
-	// Type 2 : XOOOOO ( 5 in row)
-	// Type 3 : OOOOOX ( 5 in row)
-	// Type 3 : OO__OO ( 4 in line)
-	// Horizontal
-	// Vertical
-	// Diagonal( left top - right bottom )
-	// Diagonal( / shape
-	bool iswin = false;
-	for (int i = 0; i < 19; i++)
-	{
-		for (int j = 0; j < 19; j++)
-		{
-			iswin = iswin || (can_win_checkrow(i, j, color)
-				|| can_win_checkcol(i, j, color)
-				|| can_win_checkdiag1(i, j, color)
-				|| can_win_checkdiag2(i, j, color));
-			if (iswin)
-				return iswin;
-		}
-	}
-
-	return iswin;
-}
 
 bool Plate::always_lose(Player& player)
 {
@@ -1018,8 +988,8 @@ int heuristic_eval(Plate& node, int player)
 	//printf_debug("TLL count : %d %d %d %d %d", n_threats, n_live3, n_live2, n_dead3, n_dead2);
 	// TODO implement this
 	int score = n_threats * 1000
-		+ n_live3 * 700
-		+ n_live2 * 200
+		+ n_live3 * 800
+		+ n_live2 * 310
 		+ n_dead3 * 500
 		+ n_dead2 * 50;
 	if (n_threats >= 3)
@@ -1105,7 +1075,8 @@ Action Plate::find_win(Player& player)
 		}
 	}
 	///TODO remove at submit
-	throw new exception("Should have found");
+	printf_debug("Should have found");
+	return Action();
 }
 
 Plate Plate::inverse()
@@ -1126,23 +1097,28 @@ Plate Plate::inverse()
 	return r;
 }
 
+
 pair<bool, Action> Clover1::need_defense(Plate real_plate)
 {
 	int score = -heuristic_eval(real_plate, Player::enemy().color());
 	printf_debug("Enemy theat : %d", score);
-	if (score <= -1000)
+	if (score <= -1100)
 	{
 		printf_debug("We need defense!");
 		auto actions = candi_gen_one_plus_one(real_plate, Player::enemy(), true);
 		BestAnswer best_answer;
-		for (auto c : actions)
-		{
+		function<pair<int, Action>(Action)> eval = [real_plate](Action c){
 			int enemy_score = -heuristic_eval(real_plate.do_action(c), COLOR_ENEMY);
-			int score = heuristic_eval(real_plate.do_action(c), COLOR_ME);
-			if (enemy_score < -900)
-				score = enemy_score;
-			//printf_debug("Searching best defense : %d", score);
-			best_answer.update_max(score, c);
+			int score = enemy_score;
+			if (enemy_score >= -900)
+				score = heuristic_eval(real_plate.do_action(c), COLOR_ME);
+			return pair<int, Action>(score, c);
+		};
+		auto results = mapf(actions, eval);
+		for (auto r : results)
+		{
+			//printf_debug("Searching best defense : %d", r.first);
+			best_answer.update_max(r.first, r.second);
 		}
 		printf_debug("Enemy theat decreased : %d->%d", score, best_answer.score());
 		return pair<bool, Action>(true, best_answer.action());
@@ -1151,6 +1127,16 @@ pair<bool, Action> Clover1::need_defense(Plate real_plate)
 }
 
 
+
+// Assuming players turn, can player win?
+bool Plate::can_win(Player& player)
+{
+	int board_[MAX_X][MAX_Y];
+
+	copy_to(board_);
+	int n_threats = calc_threat(board_, player.color());
+	return n_threats > 0;
+}
 
 // Global State 
 Clover1 cloverAI;
