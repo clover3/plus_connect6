@@ -95,20 +95,16 @@ static void doCommand() {
 	const char *param;
 
 	if ((param = getParam("START", cmd)) != 0) {
-		Debug("doCommand START");
 		start();
 		init();
 	}
 	else if ((param = getParam("BEGIN", cmd)) != 0) {
-		Debug("doCommand BEGIN");
 		myColor = 1;
 		cnt = 1;
 		start();
 		turn();
-		Debug("doCommand BEGIN - Done");
 	}
 	else if ((param = getParam("TURN", cmd)) != 0) {
-		Debug("doCommand TURN");
 		int x[2], y[2], r;
 		if (((r = sscanf_s(param, "%d,%d %d,%d", &x[0], &y[0], &x[1], &y[1])) != 4 && r != 2)) {
 			setLine("ERROR 형식에 맞지 않는 좌표가 입력되었습니다");

@@ -290,15 +290,12 @@ bool is_in_board(int x, int y)
 
 void printf_debug(const char* format, ...)
 {
-	if (true)
-	{
-		char buf[300];
-		va_list arglist;
-		va_start(arglist, format);
-		vsprintf_s(buf, format, arglist);
-		OutputDebugStringA(buf);
-		va_end(arglist);
-	}
+	char buf[300];
+	va_list arglist;
+	va_start(arglist, format);
+	vsprintf_s(buf, format, arglist);
+	//OutputDebugStringA(buf);
+	va_end(arglist);
 }
 
 void dbg_print_action(Action& action)
@@ -1164,7 +1161,7 @@ Clover1 cloverAI;
 // "샘플코드[C]"  -> 자신의 팀명 (수정)
 // "AI부서[C]"  -> 자신의 소속 (수정)
 // 제출시 실행파일은 반드시 팀명으로 제출!
-char info[] = { "TeamName:Ganghee,Department:Clover3" };
+char info[] = { "TeamName:Clover-Bus,Department:POSTECH-PLUS" };
 
 void myturn(int cnt) {
 	// 이 부분에서 알고리즘 프로그램(AI)을 작성하십시오. 기본 제공된 코드를 수정 또는 삭제하고 본인이 코드를 사용하시면 됩니다.
