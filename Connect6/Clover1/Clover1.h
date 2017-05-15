@@ -123,7 +123,7 @@ class BestAnswer{
 	int best_score;
 	Action best_action;
 public:
-	BestAnswer(){ best_score = -100000; }
+	BestAnswer(){ best_score = -90000000; }
 	void update_max(int score, Action& action)
 	{
 		if (score > best_score)
@@ -217,7 +217,6 @@ public:
 	void read_board( int(*pf)(int, int) );
 
 	pair<bool,Action> need_defense(Plate plate);
-	Action threat_defense(Plate& plate);
 	Plate now() {
 		return curPlate;
 	}

@@ -8,7 +8,7 @@
 #include <string>
 
 
-int heuristic_eval(Plate& node, Player& player);
+int heuristic_eval(Plate& node, int player);
 
 
 
@@ -107,18 +107,22 @@ vector<Action> generate_one_stone_candidate(Plate& node, Player player)
 	return mapf(v1, toAction);
 }
 
-vector<Action> candi_gen_one_plus_one(Plate& node, Player player)
+vector<Action> candi_gen_one_plus_one(Plate& node, Player player, bool reverse)
 {
 	int start = GetTickCount();
 	auto candi_actions = generate_one_stone_candidate(node, Player::me());
 	printf_debug("Num candidate : %d", candi_actions.size());
 
-	function<TopK(vector<Action>, Plate)> get_top_k = [](vector<Action> actions, Plate node){
+	int color = player.color();
+	function<TopK(vector<Action>, Plate)> get_top_k = [color, reverse](vector<Action> actions, Plate node){
 		TopK topK(5);
 		for (auto c : actions)
 		{
 			auto next = node.do_action(c);
-			int score = heuristic_eval(next, Player::me());
+
+			int score = heuristic_eval(next, color);
+			if (reverse)
+				score = -score;
 			topK.push(c, score);
 		}
 		return topK;
@@ -173,31 +177,6 @@ list<Action> generate_threaten(Plate& node, Player player)
 }
 
 
-
-int eval(Plate &node, int depth, Player player)
-{
-	printf_debug("eval(depth=%d, player=%d)", depth, player.color());
-	if (node.always_lose(player))
-		return -1000;
-	if (node.can_win(player))
-		return 1000;
-
-	if (depth == 0 )
-	{
-		return heuristic_eval(node, player);
-	}
-	
-	auto candidate = generate_simple(node, player);
-	BestAnswer best_answer;
-	for(auto c : candidate)
-	{
-		auto next = node.do_action(c);
-		int score = -1 * eval(next, depth - 1, player.oppo());
-		best_answer.update_max(score, c);
-	}
-	return best_answer.score();
-}
-
 void Clover1::read_board(int(*showBoard)(int, int))
 {
 	int board[MAX_X][MAX_Y] = { 0 };
@@ -211,19 +190,6 @@ void Clover1::read_board(int(*showBoard)(int, int))
 	curPlate.set(board);
 }
 
-Action Clover1::threat_defense(Plate& plate)
-{
-	list<Action> candidates = generate_simple(plate, 1);
-	printf_debug("threat_defense - %d options...", candidates.size());
-	for (auto c : candidates)
-	{
-		auto next = plate.do_action(c);
-		if (!next.can_win(Player::enemy()))
-			return c;
-	}
-	printf_debug("No... there is no way to depence");
-	return candidates.front();
-}
 
 Action Clover1::nextAction()
 {
@@ -249,12 +215,12 @@ Action Clover1::nextAction()
 
 		// Select best
 
-		auto candidates = candi_gen_one_plus_one(curPlate, Player::me());
+		auto candidates = candi_gen_one_plus_one(curPlate, COLOR_ME, false);
 		BestAnswer best_answer;
 		int heuri_time = 0;
 		for (auto c : candidates)
 		{
-			int score = heuristic_eval(curPlate.do_action(c), Player::me());
+			int score = heuristic_eval(curPlate.do_action(c), COLOR_ME);
 			best_answer.update_max(score, c);
 		}
 
@@ -430,7 +396,7 @@ int get_state(int board[MAX_X][MAX_Y], int x, int y)
 		return board[x][y];
 }
 
-int count_threat(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
+int count_threat(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy, int color)
 {
 	int ours = 0;
 	int unblocked = 0;
@@ -440,7 +406,7 @@ int count_threat(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 		int ny = y_0 + cursor * dy;
 
 		int state = get_state(board, nx, ny);
-		if (state == 1)
+		if (state == color)
 			ours++;
 		if (state == 0)
 			unblocked++;
@@ -451,7 +417,8 @@ int count_threat(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	int next_x = x_0 + 6 * dx;
 	int next_y = y_0 + 6 * dy;
 	if (ours == 4 && unblocked == 2) {
-		bool more_connection = (get_state(board, pre_x, pre_y) == 1) || (get_state(board, next_x, next_y) == 1);
+		bool more_connection = (get_state(board, pre_x, pre_y) == color) 
+			|| (get_state(board, next_x, next_y) == color);
 		if (!more_connection)
 		{
 			for (int cursor = 0; cursor < 6; cursor++) {
@@ -466,7 +433,7 @@ int count_threat(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	return 0;
 }
 
-int count_live3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
+int count_live3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy, int color)
 {
 	int ours = 0;
 	int unblocked = 0;
@@ -481,7 +448,7 @@ int count_live3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 		states[cursor] = get_state(board, nx, ny);
 	}
 	for (int cursor = 1; cursor < 5; cursor++) {
-		if (states[cursor] == 1)
+		if (states[cursor] == color)
 			ours++;
 		if (states[cursor] == 0)
 			unblocked++;
@@ -514,7 +481,7 @@ int count_live3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	return 0;
 }
 
-int count_live2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
+int count_live2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy, int color)
 {
 	int ours = 0;
 	int unblocked = 0;
@@ -529,7 +496,7 @@ int count_live2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 		states[cursor] = get_state(board, nx, ny);
 	}
 	for (int cursor = 1; cursor < 5; cursor++) {
-		if (states[cursor] == 1)
+		if (states[cursor] == color)
 			ours++;
 		if (states[cursor] == 0)
 			unblocked++;
@@ -562,7 +529,7 @@ int count_live2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	return 0;
 }
 
-int count_dead3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
+int count_dead3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy, int color)
 {
 	int ours = 0;
 	int unblocked = 0;
@@ -572,7 +539,7 @@ int count_dead3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 		int ny = y_0 + cursor * dy;
 
 		int state = get_state(board, nx, ny);
-		if (state == 1)
+		if (state == color)
 			ours++;
 		if (state == 0)
 			unblocked++;
@@ -583,7 +550,8 @@ int count_dead3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	int next_x = x_0 + 6 * dx;
 	int next_y = y_0 + 6 * dy;
 	if (ours == 3 && unblocked == 3) {
-		bool more_connection = (get_state(board, pre_x, pre_y) == 1) || (get_state(board, next_x, next_y) == 1);
+		bool more_connection = (get_state(board, pre_x, pre_y) == color) 
+			|| (get_state(board, next_x, next_y) == color);
 		if (!more_connection)
 		{
 			for (int cursor = 0; cursor < 6; cursor++) {
@@ -598,7 +566,7 @@ int count_dead3(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	return 0;
 }
 
-int count_dead2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
+int count_dead2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy, int color)
 {
 	int ours = 0;
 	int unblocked = 0;
@@ -608,7 +576,7 @@ int count_dead2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 		int ny = y_0 + cursor * dy;
 
 		int state = get_state(board, nx, ny);
-		if (state == 1)
+		if (state == color)
 			ours++;
 		if (state == 0)
 			unblocked++;
@@ -619,7 +587,8 @@ int count_dead2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	int next_x = x_0 + 6 * dx;
 	int next_y = y_0 + 6 * dy;
 	if (ours == 2 && unblocked == 4) {
-		bool more_connection = (get_state(board, pre_x, pre_y) == 1) || (get_state(board, next_x, next_y) == 1);
+		bool more_connection = (get_state(board, pre_x, pre_y) == color) 
+			|| (get_state(board, next_x, next_y) == color);
 		if (!more_connection)
 		{
 			for (int cursor = 0; cursor < 6; cursor++) {
@@ -634,135 +603,135 @@ int count_dead2(int board[MAX_X][MAX_Y], int x_0, int y_0, int dx, int dy)
 	return 0;
 }
 
-int calc_threat(int board[MAX_X][MAX_Y]) {
+int calc_threat(int board[MAX_X][MAX_Y], int color) {
 	int threats = 0;
 
 	for (int x_0 = 0; x_0 < MAX_X; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			threats += count_threat(board, x_0, y_0, 0, 1);
+			threats += count_threat(board, x_0, y_0, 0, 1, color);
 
 
 	for (int y_0 = 0; y_0 < 19; y_0++)
 		for (int x_0 = 0; x_0 + 6 < 19; x_0++)
-			threats += count_threat(board, x_0, y_0, 1, 0);
+			threats += count_threat(board, x_0, y_0, 1, 0, color);
 
 
 	for (int x_0 = -MAX_X + 5; x_0 < MAX_X - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			threats += count_threat(board, x_0, y_0, 1, 1);
+			threats += count_threat(board, x_0, y_0, 1, 1, color);
 
 
 	for (int x_0 = 5; x_0 < MAX_X * 2 - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			threats += count_threat(board, x_0, y_0, -1, 1);
+			threats += count_threat(board, x_0, y_0, -1, 1, color);
 
 	return threats;
 }
 
-int calc_live3(int board[MAX_X][MAX_Y]) {
+int calc_live3(int board[MAX_X][MAX_Y], int color) {
 	int lives = 0;
 
 	for (int x_0 = 0; x_0 < MAX_X; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			lives += count_live3(board, x_0, y_0, 0, 1);
+			lives += count_live3(board, x_0, y_0, 0, 1, color);
 
 	for (int y_0 = 0; y_0 < 19; y_0++)
 		for (int x_0 = 0; x_0 + 6 < 19; x_0++)
-			lives += count_live3(board, x_0, y_0, 1, 0);
+			lives += count_live3(board, x_0, y_0, 1, 0, color);
 
 	for (int x_0 = -MAX_X + 5; x_0 < MAX_X - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			lives += count_live3(board, x_0, y_0, 1, 1);
+			lives += count_live3(board, x_0, y_0, 1, 1, color);
 
 	for (int x_0 = 5; x_0 < MAX_X * 2 - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			lives += count_live3(board, x_0, y_0, -1, 1);
+			lives += count_live3(board, x_0, y_0, -1, 1, color);
 
 	return lives;
 }
 
-int calc_live2(int board[MAX_X][MAX_Y]) {
+int calc_live2(int board[MAX_X][MAX_Y], int color) {
 	int lives = 0;
 
 	for (int x_0 = 0; x_0 < MAX_X; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			lives += count_live2(board, x_0, y_0, 0, 1);
+			lives += count_live2(board, x_0, y_0, 0, 1, color);
 
 	for (int y_0 = 0; y_0 < 19; y_0++)
 		for (int x_0 = 0; x_0 + 6 < 19; x_0++)
-			lives += count_live2(board, x_0, y_0, 1, 0);
+			lives += count_live2(board, x_0, y_0, 1, 0, color);
 
 	for (int x_0 = -MAX_X + 5; x_0 < MAX_X - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			lives += count_live2(board, x_0, y_0, 1, 1);
+			lives += count_live2(board, x_0, y_0, 1, 1, color);
 
 	for (int x_0 = 5; x_0 < MAX_X * 2 - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			lives += count_live2(board, x_0, y_0, -1, 1);
+			lives += count_live2(board, x_0, y_0, -1, 1, color);
 
 	return lives;
 }
 
-int calc_dead3(int board[MAX_X][MAX_Y]) {
+int calc_dead3(int board[MAX_X][MAX_Y], int color) {
 	int deads = 0;
 
 	for (int x_0 = 0; x_0 < MAX_X; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			deads += count_dead3(board, x_0, y_0, 0, 1);
+			deads += count_dead3(board, x_0, y_0, 0, 1, color);
 
 	for (int y_0 = 0; y_0 < 19; y_0++)
 		for (int x_0 = 0; x_0 + 6 < 19; x_0++)
-			deads += count_dead3(board, x_0, y_0, 1, 0);
+			deads += count_dead3(board, x_0, y_0, 1, 0, color);
 
 	for (int x_0 = -MAX_X + 5; x_0 < MAX_X - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			deads += count_dead3(board, x_0, y_0, 1, 1);
+			deads += count_dead3(board, x_0, y_0, 1, 1, color);
 
 	for (int x_0 = 5; x_0 < MAX_X * 2 - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			deads += count_dead3(board, x_0, y_0, -1, 1);
+			deads += count_dead3(board, x_0, y_0, -1, 1, color);
 
 	return deads;
 }
 
-int calc_dead2(int board[MAX_X][MAX_Y]) {
+int calc_dead2(int board[MAX_X][MAX_Y], int color) {
 	int deads = 0;
 
 	for (int x_0 = 0; x_0 < MAX_X; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			deads += count_dead2(board, x_0, y_0, 0, 1);
+			deads += count_dead2(board, x_0, y_0, 0, 1, color);
 
 	for (int y_0 = 0; y_0 < 19; y_0++)
 		for (int x_0 = 0; x_0 + 6 < 19; x_0++)
-			deads += count_dead2(board, x_0, y_0, 1, 0);
+			deads += count_dead2(board, x_0, y_0, 1, 0, color);
 
 	for (int x_0 = -MAX_X + 5; x_0 < MAX_X - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			deads += count_dead2(board, x_0, y_0, 1, 1);
+			deads += count_dead2(board, x_0, y_0, 1, 1, color);
 
 	for (int x_0 = 5; x_0 < MAX_X * 2 - 5; x_0++)
 		for (int y_0 = 0; y_0 + 6 < 19; y_0++)
-			deads += count_dead2(board, x_0, y_0, -1, 1);
+			deads += count_dead2(board, x_0, y_0, -1, 1, color);
 
 	return deads;
 }
 
 
-int heuristic_eval(Plate& node, Player& player)
+int heuristic_eval(Plate& node, int player)
 {
-	int val = rand() % 10 - 5;
 	int board[MAX_X][MAX_Y];
 
 	node.copy_to(board);
-	int n_threats = calc_threat(board);
-	int n_live3 = calc_live3(board);
-	int n_live2 = calc_live2(board);
-	int n_dead3 = calc_dead3(board);
-	int n_dead2 = calc_dead2(board);
+	int color = player;
+	int n_threats = calc_threat(board, color);
+	int n_live3 = calc_live3(board, color);
+	int n_live2 = calc_live2(board, color);
+	int n_dead3 = calc_dead3(board, color);
+	int n_dead2 = calc_dead2(board, color);
 	// TODO implement this
 	int score = n_threats * 1000
-		+ n_live3 * 500
-		+ n_live2 * 100
+		+ n_live3 * 700
+		+ n_live2 * 150
 		+ n_dead3 * 30
 		+ n_dead2 * 10;
 	if (n_threats >= 3)
@@ -871,37 +840,19 @@ Plate Plate::inverse()
 
 pair<bool, Action> Clover1::need_defense(Plate real_plate)
 {
-	if (real_plate.can_win(Player::enemy()))
+	int score = - heuristic_eval(real_plate, Player::enemy().color());
+
+	if ( score <= -1400 )
 	{
-		return pair<bool, Action>(true, threat_defense(real_plate));
-	}
-	else
-	{
-		printf_debug("Check possible double threat");
-		Plate inversePlate = real_plate.inverse();
-		vector<Action> actions = generate_one_stone_candidate(inversePlate, Player::me());
+		printf_debug("Enemy theat : %d", score);
+		auto actions = candi_gen_one_plus_one(real_plate, Player::enemy(), true);
+		BestAnswer best_answer;
 		for (auto c : actions)
 		{
-			auto next = inversePlate.do_action(c);
-			int board[MAX_X][MAX_Y];
-			next.copy_to(board);
-			if (calc_threat(board) >= 1 && calc_live3(board) >= 1)
-			{
-				auto candi_action2s = generate_one_stone_candidate(real_plate, Player::me());
-				BestAnswer best;
-				for (auto c2 : candi_action2s)
-				{
-					Plate n2 = real_plate.do_action(c2);
-					int score = heuristic_eval(n2, Player::me());
-					best.update_max(score, c2);
-				}
-
-				Position stone1 = c.stone1;
-				Position stone2 = best.action().stone1;
-
-				return pair<bool, Action>(true, Action(stone1, stone2, 1, false));
-			}
+			int score = -heuristic_eval(curPlate.do_action(c), COLOR_ENEMY);
+			best_answer.update_max(score, c);
 		}
-		return pair<bool, Action>(false, Action());
+		return pair<bool, Action>(true, best_answer.action());
 	}
+	return pair<bool, Action>(false, Action());
 }
