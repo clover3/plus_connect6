@@ -728,6 +728,7 @@ int heuristic_eval(Plate& node, int player)
 	int n_live2 = calc_live2(board, color);
 	int n_dead3 = calc_dead3(board, color);
 	int n_dead2 = calc_dead2(board, color);
+	printf_debug("TLL count : %d %d %d %d %d", n_threats, n_live3, n_live2, n_dead3, n_dead2);
 	// TODO implement this
 	int score = n_threats * 1000
 		+ n_live3 * 700
@@ -841,10 +842,10 @@ Plate Plate::inverse()
 pair<bool, Action> Clover1::need_defense(Plate real_plate)
 {
 	int score = - heuristic_eval(real_plate, Player::enemy().color());
-
-	if ( score <= -1400 )
+	printf_debug("Enemy theat : %d", score);
+	if ( score <= -1000 )
 	{
-		printf_debug("Enemy theat : %d", score);
+		printf_debug("We need defense");
 		auto actions = candi_gen_one_plus_one(real_plate, Player::enemy(), true);
 		BestAnswer best_answer;
 		for (auto c : actions)
